@@ -3,6 +3,7 @@ package database
 import (
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
 	"github.com/coder/coder/v2/coderd/rbac"
@@ -76,6 +77,24 @@ func TestAPIKeyScopesExpand(t *testing.T) {
 		requirePermission(t, s, rbac.ResourceWorkspace.Type, policy.ActionApplicationConnect)
 		requirePermission(t, s, rbac.ResourceWorkspace.Type, policy.ActionRead)
 		requireAllowAll(t, s)
+	})
+
+	t.Run("effective_scope_keep_types", func(t *testing.T) {
+		t.Parallel()
+		workspaceID := uuid.New()
+		target, err := NewAllowListTarget("workspace", workspaceID.String())
+		require.NoError(t, err)
+
+		effective := APIKeyEffectiveScope{
+			Scopes:    APIKeyScopes{ApiKeyScopeWorkspaceRead},
+			AllowList: AllowList{target},
+		}
+
+		expanded, err := effective.Expand()
+		require.NoError(t, err)
+		require.Len(t, expanded.AllowIDList, 1)
+		require.Equal(t, "workspace", expanded.AllowIDList[0].Type)
+		require.Equal(t, workspaceID.String(), expanded.AllowIDList[0].ID)
 	})
 
 	t.Run("empty_defaults_to_all", func(t *testing.T) {
