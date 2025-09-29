@@ -58,7 +58,7 @@ func (r *Runner) RunReturningWorkspace(ctx context.Context, id string, logs io.W
 	}
 	r.workspaceID = workspace.ID
 
-	err = waitForBuild(ctx, logs, r.client, workspace.LatestBuild.ID)
+	err = WaitForBuild(ctx, logs, r.client, workspace.LatestBuild.ID)
 	if err != nil {
 		for i := 0; i < r.cfg.Retry; i++ {
 			_, _ = fmt.Fprintf(logs, "Retrying build %d/%d...\n", i+1, r.cfg.Retry)
@@ -71,7 +71,7 @@ func (r *Runner) RunReturningWorkspace(ctx context.Context, id string, logs io.W
 			if err != nil {
 				return codersdk.Workspace{}, xerrors.Errorf("create workspace build: %w", err)
 			}
-			err = waitForBuild(ctx, logs, r.client, workspace.LatestBuild.ID)
+			err = WaitForBuild(ctx, logs, r.client, workspace.LatestBuild.ID)
 			if err == nil {
 				break
 			}
@@ -143,7 +143,7 @@ func (r *CleanupRunner) Run(ctx context.Context, _ string, logs io.Writer) error
 		logger.Info(ctx, "canceling workspace build", slog.F("build_id", build.ID), slog.F("workspace_id", r.workspaceID))
 		if err = r.client.CancelWorkspaceBuild(ctx, build.ID, codersdk.CancelWorkspaceBuildParams{}); err == nil {
 			// Wait for the job to cancel before we delete it
-			_ = waitForBuild(ctx, logs, r.client, build.ID) // it will return a "build canceled" error
+			_ = WaitForBuild(ctx, logs, r.client, build.ID) // it will return a "build canceled" error
 		} else {
 			logger.Warn(ctx, "failed to cancel workspace build, attempting to delete anyway", slog.Error(err))
 		}
@@ -158,7 +158,7 @@ func (r *CleanupRunner) Run(ctx context.Context, _ string, logs io.Writer) error
 		return xerrors.Errorf("delete workspace: %w", err)
 	}
 
-	err = waitForBuild(ctx, logs, r.client, build.ID)
+	err = WaitForBuild(ctx, logs, r.client, build.ID)
 	if err != nil {
 		return xerrors.Errorf("wait for build: %w", err)
 	}
@@ -174,7 +174,7 @@ func (r *Runner) Cleanup(ctx context.Context, id string, w io.Writer) error {
 	}).Run(ctx, id, w)
 }
 
-func waitForBuild(ctx context.Context, w io.Writer, client *codersdk.Client, buildID uuid.UUID) error {
+func WaitForBuild(ctx context.Context, w io.Writer, client *codersdk.Client, buildID uuid.UUID) error {
 	ctx, span := tracing.StartSpan(ctx)
 	defer span.End()
 	_, _ = fmt.Fprint(w, "Build is currently queued...")
